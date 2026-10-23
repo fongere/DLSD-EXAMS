@@ -1,0 +1,61 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>School of Exams — Management POC</title>
+  <script src="https://accounts.google.com/gsi/client" async></script>
+</head>
+<body>
+  <h1>School of Exams</h1>
+  <p>Management identity verification test</p>
+
+  <div id="status">Loading Google Sign-In…</div>
+  <div id="google-button"></div>
+
+  <script>
+    const CLIENT_ID = "YOUR_GOOGLE_OAUTH_CLIENT_ID";
+
+    function showStatus(message) {
+      document.getElementById("status").textContent = message;
+    }
+
+    function handleCredentialResponse(response) {
+      // Do not display, log, or share the credential.
+      // Next step: send it securely to the Apps Script backend.
+      showStatus(
+        response.credential
+          ? "Google sign-in succeeded. Backend verification is not yet connected."
+          : "No credential was returned."
+      );
+    }
+
+    window.addEventListener("load", () => {
+      if (!CLIENT_ID ||
+          CLIENT_ID === "YOUR_GOOGLE_OAUTH_CLIENT_ID") {
+        showStatus("Configure the Google OAuth Client ID first.");
+        return;
+      }
+
+      const checkGoogle = setInterval(() => {
+        if (!window.google?.accounts?.id) return;
+
+        clearInterval(checkGoogle);
+
+        google.accounts.id.initialize({
+          client_id: CLIENT_ID,
+          callback: handleCredentialResponse
+        });
+
+        google.accounts.id.renderButton(
+          document.getElementById("google-button"),
+          { theme: "outline", size: "large", text: "signin_with" }
+        );
+
+        showStatus("Google Sign-In is ready.");
+      }, 200);
+    });
+  </script>
+</body>
+</html>
