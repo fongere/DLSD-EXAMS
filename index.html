@@ -14,48 +14,113 @@
   <div id="status">Loading Google Sign-In…</div>
   <div id="google-button"></div>
 
-  <script>
-    const CLIENT_ID = "671919004453-2vr117skpkd4rlps0n6iq8l91u1vunr2.apps.googleusercontent.com";
 
-    function showStatus(message) {
-      document.getElementById("status").textContent = message;
+<script>
+  const CLIENT_ID =
+    "671919004453-2vr117skpkd4rlps0n6iq8l91u1vunr2.apps.googleusercontent.com";
+
+  const BACKEND_URL =
+    "https://soe-management-api-671919004453.africa-south1.run.app";
+
+  function showStatus(message) {
+    document.getElementById("status").textContent = message;
+  }
+
+  async function handleCredentialResponse(response) {
+    if (!response || !response.credential) {
+      showStatus("Google did not return a credential. Please try again.");
+      return;
     }
 
-    function handleCredentialResponse(response) {
-      // Do not display, log, or share the credential.
-      // Next step: send it securely to the Apps Script backend.
-      showStatus(
-        response.credential
-          ? "Google sign-in succeeded. Backend verification is not yet connected."
-          : "No credential was returned."
-      );
-    }
+    showStatus("Google sign-in succeeded. Verifying your access...");
 
-    window.addEventListener("load", () => {
-      if (!CLIENT_ID ||
-          CLIENT_ID === "YOUR_GOOGLE_OAUTH_CLIENT_ID") {
-        showStatus("Configure the Google OAuth Client ID first.");
+    try {
+      const result = await fetch(`${BACKEND_URL}/api/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          credential: response.credential
+        })
+      });
+
+      let data;
+
+      try {
+        data = await result.json();
+      } catch {
+        throw new Error("The backend returned an unexpected response.");
+      }
+
+      if (!result.ok || !data.ok || !data.authenticated) {
+        if (data.error === "ACCESS_DENIED") {
+          showStatus(
+            "Your Google account is not authorized for the management dashboard."
+          );
+        } else if (data.error === "IDENTITY_LOOKUP_FAILED") {
+          showStatus(
+            "The identity service could not be reached. Please try again later."
+          );
+        } else {
+          showStatus(
+            "Backend verification failed. Please check the setup and try again."
+          );
+        }
         return;
       }
 
-      const checkGoogle = setInterval(() => {
-        if (!window.google?.accounts?.id) return;
+      if (!["ADMIN", "TEACHER"].includes(data.role)) {
+        showStatus("Access denied: no valid management role was returned.");
+        return;
+      }
 
-        clearInterval(checkGoogle);
+      showStatus(
+        `Identity verified. Role: ${data.role}. Further dashboard access controls are still required.`
+      );
 
-        google.accounts.id.initialize({
-          client_id: CLIENT_ID,
-          callback: handleCredentialResponse
-        });
+      // Do not treat this response as a persistent login session.
+      // A secure session and role-protected management endpoints
+      // must be implemented before enabling dashboard operations.
 
-        google.accounts.id.renderButton(
-          document.getElementById("google-button"),
-          { theme: "outline", size: "large", text: "signin_with" }
-        );
+    } catch (error) {
+      console.error("Backend request failed:", error.message);
+      showStatus(
+        "Could not contact the backend. Check the network and API configuration."
+      );
+    }
+  }
 
-        showStatus("Google Sign-In is ready.");
-      }, 200);
-    });
-  </script>
+  window.addEventListener("load", () => {
+    if (!CLIENT_ID ||
+        CLIENT_ID === "YOUR_GOOGLE_OAUTH_CLIENT_ID") {
+      showStatus("Configure the Google OAuth Client ID first.");
+      return;
+    }
+
+    const checkGoogle = setInterval(() => {
+      if (!window.google?.accounts?.id) return;
+
+      clearInterval(checkGoogle);
+
+      google.accounts.id.initialize({
+        client_id: CLIENT_ID,
+        callback: handleCredentialResponse
+      });
+
+      google.accounts.id.renderButton(
+        document.getElementById("google-button"),
+        {
+          theme: "outline",
+          size: "large",
+          text: "signin_with"
+        }
+      );
+
+      showStatus("Google Sign-In is ready.");
+    }, 200);
+  });
+</script>
+
 </body>
 </html>
